@@ -1,12 +1,54 @@
 <template>
       <div class="hotmap-content">
+        <div class="svg" style="margin-right:1rem">
+          <!-- 环形进度条 -->
+               <svg :width="width" :height="height">
+                 <!-- 凹槽 -->
+                <circle class="line"  
+                :cx="(width/2)" 
+                :cy="(height/2)" 
+                :r="(width-w*2)/2" 
+                stroke-width="10"  
+                stroke="#ccc" 
+                stroke-linejoin="round" 
+                stroke-linecap="round"
+                :stroke-dasharray="[girth, girth]"
+                />
+                <!-- 进度条 -->
+                <circle 
+                fill="#fff" 
+                :cx="(width/2)" 
+                :cy="(height/2)" 
+                :r="(width-w*2)/2"  
+                stroke-width="5"  
+                stroke="hsl(160,80%,50%)" 
+                :stroke-dasharray="[lineNum, girth]"
+                stroke-linejoin="round" 
+                stroke-linecap="round"
+                
+                />
+                <!-- 数字 -->
+                    <text
+                      text-anchor="middle"
+                      :x="(width)/2"
+                      :y="(height)/2+fontSize/2"
+                      fill="#008c8c"
+                      :font-size="fontSize"
+                      font-weight="100"
+                     >
+                      {{ textNum }}%
+                    </text>
+          
+              </svg>
+          
+        </div>
+          
         <!-- 侧边栏 -->
            <div class="hotmap-content_silder">
                 <div class="hotmap-content_silder_title">
                     <div  
                     v-for="(item,index) in titles" :key="index"
                     :class="[index==activeIndex?'active':'']" @click="onchangelist(index)" >{{ item }}</div>
-                 
                 </div>
                 <div class="hotmap-content_silder_list">
                     <div 
@@ -17,7 +59,6 @@
                     >
                         {{ item }}
                     </div>
-                  
                 </div>
            </div>
            <div class="hotmap-content_dome">
@@ -28,8 +69,29 @@
                 <div class="hotmap-content_dome_map">
                         <div id="myChartChinas" ref="mapChart" style="width:100%;height:100%"></div>
                 </div>
+                <p>前提需要安装echarts</p>
+                 <div class="charts map">
+                    <my-maps-charts
+                    :addresinfo="addresinfo" 
+                    :maptype="maptype"
+                    :mapName="mapName"
+                  ></my-maps-charts>
+                  
+               </div>
+               <div class="charts table">
+                    <cate-bar-charts 
+                     typename="bar"
+                     :addresinfo="addresinfo"
+                    ></cate-bar-charts>
+               </div>
+                 <div class="charts table">
+                    <cate-line-charts 
+                     typename="line"
+                     :addresinfo="addresinfo"
+                    ></cate-line-charts>
+               </div>
            </div>
-         
+           
       </div>
 </template>
 <script>
@@ -40,15 +102,54 @@
  * 
  * 
  */
-import { encrypt,decrypt } from '../api/jsencrypt';
+
 import china from 'echarts/map/json/china.json';
-import echarts from 'echarts'
+
+import echarts from 'echarts';
+
 export default {
   name: 'HelloWorld',
   data(){
      return{
+     
+         w:20,
+         width:150,
+         height:150,
+          lineNum:0,
+         girth:0,
+        
+         textNum:0,
+
+
+         fontSize:16, // 字体大小
+         offsetY:10,  // 纵向偏移
+         offsetX:20,  // 横向偏移
+         line:[],     // 柱子数据
+      
+         yline:[],    // 灰色标线
+         hline:[],    // y轴数字
+         textline:[], // x轴文字
+            
+        
          activeIndex:0,
          activeIndex2:0,
+         maptype:china,
+         mapName:'china',
+         addresinfo:[
+           {
+              name:'北京',
+              type:16
+           },{
+              name:'天津',
+              type:28
+           },{
+              name:'北京',
+              type:80
+           },{
+              name:'天津',
+              type:120
+           }
+        ],
          titles:[
               '菜单一',
               '菜单二',
@@ -96,15 +197,115 @@ export default {
         text:''
      }
   },
-  
+  components: {
+    // HelloWorld
+    // lineSvg
+  },
   mounted(){
-    // 使用jsencrypt加密数据
-    var str = encrypt('16860'); // 加密 
-    console.groupCollapsed('加密',str);
-    console.log('解密',decrypt(str))   //解密
+    /**
+     * 
+     * 圆形滚动条
+     * 
+     */
+    let num2 = "99%";
+        num2 = parseInt(num2.replace(/%$/g,''));
+        console.log(num2)
+        this.textNum = num2;
+    //  圆周长 566,1193.2 =>596.6
+   let r = (this.width-this.w*2)/2; 
+   this.girth = 2*3.14*r+3.14*(this.width-this.w*2);
+   this.lineNum = Math.round((num2/100) * (this.girth/2));
+   
+   console.log(this.lineNum)
+
+
+
+   
+
+  
+    /**
+     * 
+     *svg 柱状图
+     * 需要找到 最大值 然后运算
+     * 需要 将 数值拿出来 进行排序
+     * 总体难点 
+     * 1. 需要考虑 柱子的自适应宽度 和 位置 
+     * 2. 需要考虑 自适应横纵、纵坐标 文字、数字位置 
+     * 3. 数字 比例 自适应 这里以5的公倍数来计算
+     * 
+     */
+     let len = this.addresinfo.length;
+    let sortarr = [];
+    this.addresinfo.forEach((item)=>{
+             sortarr.push(item.type)
+    })
+    // 排序
+    let len2 = sortarr.length-1;
+    let tmp=null;
+    for(var j=0; j<len2; j++){      //循环9次
+        for(var i=0; i<len2-j; i++){    //每次比较10-j-1次数
+        if(sortarr[i]>sortarr[i+1]){
+            tmp = sortarr[i+1];
+            sortarr[i+1] = sortarr[i];
+            sortarr[i] = tmp;
+        }
+       }
+    }
+    
+   
+    let num = sortarr[len2]; // 假设 最大值  重点值
+    var yline = num+Math.abs(5-(num%5));
+    if(num%5==0){
+        yline = num;
+    }
+  
+  //  设置 主子 和 横坐标文字位置
+    this.addresinfo.forEach((item,index)=>{
+    
+         let h = (Math.round(item.type/yline * 10000) / 100.00); // 计算高度占比
+        
+         let obj = {
+                value:item.type,
+                name:item.name,
+                y:this.height-(h/100*this.height)+this.offsetY,                     // 纵坐标 必须高度-高度百分比==实际高度
+                h:h/100*this.height,
+                w:parseInt(this.width/len)-20,       // 计算 自适应宽度
+                x:parseInt(this.width/len)*index+20+this.offsetX/2  // 计算 自适应横向间隔
+         }
+         this.line.push(obj);
+         this.textline.push(obj)
+    })
+ 
+  //  设置 纵坐标 数字和标线的位置
+    for(let n = 0;n<5;n++){
+      
+          let obj = {
+               y:10+(this.height/5)*n,   // 计算纵坐标的位置       位置是以左上角为准 需要更精确化
+               value:(yline/5)*(5-n)     // 计算自适应纵坐标的值   因为坐标是从上到下的 所以 需要倒叙计算
+          }
+          let obj2 = {
+               x:3-String((yline/5)*(5-n) ).length,
+               y:10+(this.height/5)*n,   // 计算纵坐标的位置       位置是以左上角为准 需要更精确化
+               value:(yline/5)*(5-n)     // 计算自适应纵坐标的值   因为坐标是从上到下的 所以 需要倒叙计算
+               
+        }
+          this.yline.push(obj);
+          this.hline.push(obj2);
+    }
+      this.yline; 
+   
+
+
+
+
+
+
+
+
+
+    // 地图 标注 
     this.drawLine();
     this.$nextTick(()=>{
-        
          setTimeout(()=>{
                 //  异步清空 添加动画
                    this.datalist = this.list[this.activeIndex];    
@@ -375,6 +576,24 @@ export default {
 </script>
 
 <style lang="less" scoped>
+     .line{
+        fill: transparent;
+        stroke-width: 10px;
+        transition: all .2s ease-in 0s;
+     }
+     #circle {
+        stroke-dasharray: 250.921;
+        // stroke-dashoffset: 20;
+        // animation: round 3s linear infinite;
+      }
+       @keyframes round {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+     .charts{
+        background: rgb(38, 36, 61);
+     }
      .disflex(@type){
             display: flex;
             flex-direction:@type;
