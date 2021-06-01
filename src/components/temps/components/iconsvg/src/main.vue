@@ -1,13 +1,14 @@
 <!--
  * @Author: your name
  * @Date: 2021-05-21 09:53:27
- * @LastEditTime: 2021-05-21 13:33:59
+ * @LastEditTime: 2021-06-01 09:27:39
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \silders\src\components\temps\components\iconsvg\iconsvg.vue
 -->
 <template>
       <svg class="svgClass" :fill="color" :width="size" :height="size" aria-hidden="true" v-on="$listeners">
+           <!-- 注意：需要安装svg-sprite-loader 才能使用引入的svg模块  -->
          <use :xlink:href="iconName" />
      </svg>
 </template>
